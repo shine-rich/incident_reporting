@@ -2,8 +2,7 @@ import openai
 import json
 import os
 import requests
-from datetime import datetime
-from colorama import Fore, Style
+import streamlit as st
 
 # Initialize the OpenAI client
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -93,29 +92,17 @@ def report_cheating_incident(name, email, incident_summary):
     }
     headers = {"Content-Type": "application/json"}
     response = requests.post(url, json=payload, headers=headers)
-    print("Status Code:", response.status_code)
-    # Check if the response content is not empty before parsing as JSON
-    if response.text.strip():  # Check if the response body is not empty
-        try:
-            print("Response Body:", response.json())
-        except ValueError as e:
-            print("Raw Response Content:", response.text)
-    else:
-        print("Response Body is empty.")
+    return response
 
 def get_bullying_incidents():
     url = "http://172.232.185.245:3000/incidents"
     response = requests.get(url)
-    print("Status Code:", response.status_code)
-    print("Response Body:", response.json())
-    return response.json()
+    return response
 
 def get_cheating_incidents():
     url = "http://172.232.185.245:3000/incidents"
     response = requests.get(url)
-    print("Status Code:", response.status_code)
-    print("Response Body:", response.json())
-    return response.json()
+    return response
 
 def report_bullying_incident(name, email, incident_summary):
     url = "http://172.232.185.245:3000/incidents"
@@ -127,15 +114,7 @@ def report_bullying_incident(name, email, incident_summary):
     }
     headers = {"Content-Type": "application/json"}
     response = requests.post(url, json=payload, headers=headers)
-    print("Status Code:", response.status_code)
-    # Check if the response content is not empty before parsing as JSON
-    if response.text.strip():  # Check if the response body is not empty
-        try:
-            print("Response Body:", response.json())
-        except ValueError as e:
-            print("Raw Response Content:", response.text)
-    else:
-        print("Response Body is empty.")
+    return response
 
 # Function to handle OpenAI function calls
 def function_call(ai_response):
@@ -144,19 +123,23 @@ def function_call(ai_response):
     arguments = json.loads(function_call.arguments)
 
     if function_name == "get_cheating_incidents":
-        return get_cheating_incidents()
+        response = get_cheating_incidents()
+        return response.json()
     elif function_name == "get_bullying_incidents":
-        return get_bullying_incidents()
+        response = get_bullying_incidents()
+        return response.json()
     elif function_name == "report_cheating_incident":
         name = arguments.get("name")
         email = arguments.get("email")
         incident_summary = arguments.get("incident_summary")
-        return report_cheating_incident(name, email, incident_summary)
+        response = report_cheating_incident(name, email, incident_summary)
+        return f"Incident reported successfully. Status Code: {response.status_code}"
     elif function_name == "report_bullying_incident":
         name = arguments.get("name")
         email = arguments.get("email")
         incident_summary = arguments.get("incident_summary")
-        return report_bullying_incident(name, email, incident_summary)
+        response = report_bullying_incident(name, email, incident_summary)
+        return f"Incident reported successfully. Status Code: {response.status_code}"
     else:
         return None
 
@@ -191,32 +174,77 @@ def ask_function_calling(query):
     # Extract and format the assistant's response content
     if response.choices[0].finish_reason == "stop":
         assistant_response = response.choices[0].message.content
+        return assistant_response
 
-        # Format the response for better readability
-        print(Fore.GREEN + f"\n=== Cheating Incidents Report ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===" + Style.RESET_ALL)
-        print(assistant_response)
-        print(Fore.GREEN + "=================================" + Style.RESET_ALL + "\n")
+# Streamlit App
+def main():
+    st.title("Incident Reporting System")
 
-# Test queries
+    # Sidebar for options
+    st.sidebar.header("Options")
+    option = st.sidebar.selectbox(
+        "What would you like to do?",
+        ("Chatbot Mode", "Get Cheating Incidents", "Get Bullying Incidents", "Report Cheating Incident", "Report Bullying Incident")
+    )
 
-#1. Trigger get_cheating_incidents:
-# This query will fetch all cheating incidents.
-user_query = "Can you get me the latest cheating incidents?"
+    # Initialize session state for chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-# 2. Trigger get_bullying_incidents:
-# This query will fetch all bullying incidents. Note that the performanceId parameter is not used in the get_bullying_incidents function in the code, so you can omit it.
-#user_query = "Can you retrieve all bullying incidents?"
+    # Chatbot Mode
+    if option == "Chatbot Mode":
+        st.write("Chatbot Mode: Type your query below.")
+        user_input = st.chat_input("Type your message here...")
+        if user_input:
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.markdown(user_input)
 
-# 3. Trigger report_cheating_incident:
-# This query will report a cheating incident. Replace the placeholders with appropriate values.
-#user_query = "Report a cheating incident for student John Doe with email 'john.doe@example.com' and incident summary 'John was caught cheating during the math exam.'"
+            # Get assistant response
+            assistant_response = ask_function_calling(user_input)
 
-# 4. Trigger report_bullying_incident:
-# This query will report a bullying incident. Replace the placeholders with appropriate values.
-#user_query = "Report a bullying incident for student Jane Smith with email 'jane.smith@example.com' and incident summary 'Jane was bullied during recess.'"
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+            with st.chat_message("assistant"):
+                st.markdown(assistant_response)
 
-# 5. Mixed Query:
-# You can also test a mixed query to see how the program handles multiple function calls or ambiguous requests.
-#user_query = "Can you get me the latest cheating incidents and also report a bullying incident for student Alex Brown with email 'alex.brown@example.com' and incident summary 'Alex was bullied in the hallway.'"
+    # Specific actions
+    elif option == "Get Cheating Incidents":
+        st.write("Fetching cheating incidents...")
+        response = get_cheating_incidents()
+        st.write("Status Code:", response.status_code)
+        st.write("Response Body:", response.json())
+    elif option == "Get Bullying Incidents":
+        st.write("Fetching bullying incidents...")
+        response = get_bullying_incidents()
+        st.write("Status Code:", response.status_code)
+        st.write("Response Body:", response.json())
+    elif option == "Report Cheating Incident":
+        st.write("Report a cheating incident:")
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        incident_summary = st.text_area("Incident Summary")
+        if st.button("Submit"):
+            response = report_cheating_incident(name, email, incident_summary)
+            st.write("Status Code:", response.status_code)
+            st.write("Response Body:", response.text)
+    elif option == "Report Bullying Incident":
+        st.write("Report a bullying incident:")
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        incident_summary = st.text_area("Incident Summary")
+        if st.button("Submit"):
+            response = report_bullying_incident(name, email, incident_summary)
+            st.write("Status Code:", response.status_code)
+            st.write("Response Body:", response.text)
 
-ask_function_calling(user_query)
+    # Display chat history in the main area
+    st.write("### Conversation History")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# Run the Streamlit app
+if __name__ == "__main__":
+    main()
