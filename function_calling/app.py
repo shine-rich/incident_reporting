@@ -6,6 +6,8 @@ import streamlit as st
 
 # Initialize the OpenAI client
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+base = "http://172.232.168.241:3000"
+url = f"{base}/incidents"
 
 # Function descriptions
 function_descriptions = [
@@ -83,7 +85,6 @@ function_descriptions = [
 
 # Functions to handle incidents
 def report_cheating_incident(name, email, incident_summary):
-    url = "http://172.232.185.245:3000/incidents"
     payload = {
         "name": name,
         "email": email,
@@ -95,17 +96,14 @@ def report_cheating_incident(name, email, incident_summary):
     return response
 
 def get_bullying_incidents():
-    url = "http://172.232.185.245:3000/incidents"
     response = requests.get(url)
     return response
 
 def get_cheating_incidents():
-    url = "http://172.232.185.245:3000/incidents"
     response = requests.get(url)
     return response
 
 def report_bullying_incident(name, email, incident_summary):
-    url = "http://172.232.185.245:3000/incidents"
     payload = {
         "name": name,
         "email": email,
